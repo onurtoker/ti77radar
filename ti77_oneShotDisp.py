@@ -1,4 +1,4 @@
-# TI 77GHz Radar live demo sample code
+# TI 77GHz Radar sample code
 
 import ti77radar
 import numpy as np

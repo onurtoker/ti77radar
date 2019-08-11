@@ -3,6 +3,7 @@
 # TODO: Add documentation strings
 import socket
 import numpy as np
+import math
 
 class Device:
     # TI radar device
@@ -20,17 +21,22 @@ class Device:
         self.UDP_IP = None
         self.UDP_PORT = None
         self.NS = None
+        self.fs = None
+        self.cf = None
         self.sock = None
         self.frame = None
         print('Device created')
 
-    def config(self, rx=4, tx=2, UDP_IP = "192.168.33.30", UDP_PORT = 4098, NS = 256):
+    def config(self, rx=4, tx=2, UDP_IP = "192.168.33.30", UDP_PORT = 4098, NS = 256, \
+                        fs=10e6, cf =0.5*3e8*1e-6/29.982e6):
         # Configuration of the ti77radar
         self.rx = rx
         self.tx = tx
         self.UDP_IP = UDP_IP
         self.UDP_PORT = UDP_PORT
         self.NS = NS
+        self.fs = fs
+        self.cf = cf
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
             self.sock.bind((UDP_IP, UDP_PORT))
@@ -57,11 +63,24 @@ class Device:
         # Get channel data from captured frame info
         return self.frame[k,:]
 
+    def average_frames(self, n):
+        f = np.zeros((self.rx, self.NS))
+        self.clear_buffer()
+        k = 0
+        while (k < n):
+            try:
+                f = f + self.capture_frame()
+                k = k + 1
+            except:
+                break
+        f = f / k
+        self.frame = f
+        return f
+
     def capture_frame(self):
         # Read a single frame, and return as an rx by NS matrix
 
-        # TODO: Generalize
-        NC = 6      # no of UDP packets to capture
+        NC = math.ceil(2 * self.rx * self.NS * 4 / (self.EL - 10))
 
         # Read successive NC frames
         data_v = [None] * NC
@@ -79,8 +98,7 @@ class Device:
                     raise IOError #return None
 
         # adapted from MATLAB sample provided by TI
-        # TODO: Generalize
-        lvds = np.zeros(NC * 16 * self.NS, dtype=np.complex)
+        lvds = np.zeros(NC * (self.EL - 10) // 4, dtype=np.complex)
         counter = 0
         for k in range(NC):
             # generate local adc_data
@@ -90,16 +108,15 @@ class Device:
                 lvds[counter + 1]   = adc_data[i+1] + 1j * adc_data[i+3]
                 counter = counter + 2
 
-        # find chirp start/end (ChirpLen=256)
-        # TODO: Generalize
-        rn = int.from_bytes(data_v[0][4:10], byteorder='little')
-        ki = rn // 16
-        dk = (-ki) % self.NS
+        # find block start/end
+        rn = int.from_bytes(data_v[0][4:10], byteorder='little') // 4
+        dk = (-rn) % (self.rx * self.NS)
+
+        #print(cseq_no, rn, dk, counter)
 
         # finally
-        # TODO: Generalize
-        f = lvds[dk : dk + 4 * self.NS]
-        f = f.reshape((4,-1))
+        f = lvds[dk : dk + self.rx * self.NS]
+        f = f.reshape((self.rx,-1))
         self.frame = f
         return f
 
