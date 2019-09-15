@@ -11,8 +11,9 @@ tir = ti77radar.Device('awr1642')
 tir.config()
 
 # FFT upscale and Rmax
-Mu = 16
+Mu = 256
 Rmax = 1.00
+gLen=100
 
 # DSP
 fs = tir.fs
@@ -23,14 +24,14 @@ kmax = round(Rmax * M / fs / cf)
 
 # Figure / Animation
 fig = plt.figure()
-ax = plt.axes(xlim=(-45,45), ylim=(0, 25))
-ax.set_title('FFT spectrum')
+ax = plt.axes(xlim=(-gLen, 0), ylim=(0, 100))
+ax.set_title('Distance (cm)')
 ax.grid()
 [line] = ax.plot([], [], 'b-')
-tetv = np.linspace(-np.pi / 3, np.pi / 3, 100)
 
 def init():
-    line.set_xdata(180 / np.pi * tetv)
+    line.set_xdata(np.arange(-gLen,0))
+    line.set_ydata(np.zeros(gLen))
     return [line]
 
 def animate(i):
@@ -38,18 +39,16 @@ def animate(i):
         tir.clear_buffer()
         #f = tir.capture_frame()
         f = tir.average_frames(8)
-        yv = 0 * tetv
-        for (k, tet) in enumerate(tetv):
-            w = np.exp(1j * tet)
-            s = np.matmul(np.array([w ** p for p in range(tir.rx)]), f)
-            s = s.reshape((-1,))
-            S = fft(s, M)
-            S = np.abs(S[:kmax])
-            S = S / M
-            yv[k] = np.max(S)
+        s = np.matmul(np.ones((1,tir.rx)) / tir.rx, f)
+        s = s.reshape((-1,))
+        S = fft(s, M)
+        S = np.abs(S[:kmax])
+        #S = S / M
     except:
-        yv = np.zeros(kmax)
-    line.set_ydata(yv)
+        S = np.zeros(kmax)
+
+    dist = 100 * cf * fval[np.argmax(S)]
+    line.set_ydata(np.append(line.get_ydata()[-gLen+1:], dist))
     return [line]
 
 anim = FuncAnimation(fig, animate, init_func=init, interval=100, blit=True)

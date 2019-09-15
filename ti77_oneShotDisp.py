@@ -16,11 +16,15 @@ fig, axv = plt.subplots(2,2)
 
 for k in range(tir.rx):
     s = tir.get_channel(k)  # get channel k data from captured info
-
     sI=np.real(s)
     sQ=np.imag(s)
+
     axv[k//2, k%2].plot(np.array(range(tir.NS)), sI, 'b-')
     axv[k//2, k%2].plot(np.array(range(tir.NS)), sQ, 'r-')
     axv[k//2, k%2].grid()
+    axv[k//2, k%2].legend(['real','imag'])
+    axv[k//2, k%2].set_title('RX' + str(k))
+    axv[k//2, k%2].set_xlabel('sample index')
+    axv[k//2, k%2].set_ylabel('raw ADC output')
 
 plt.show()
